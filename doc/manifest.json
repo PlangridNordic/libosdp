@@ -1,0 +1,93 @@
+{
+  "format": 1,
+  "doxygen": {
+    "c_inputs": ["include/osdp.h"]
+  },
+  "python": {
+    "inputs": ["python/osdp"],
+    "exclude": ["python/osdp/_sys.pyi", "python/osdp/_marshal.py", "python/osdp/_validate.py"],
+    "filter": "python/doxy-pyfilter.py"
+  },
+  "sidebar": [
+    {
+      "text": "Overview",
+      "items": [
+        { "text": "Introduction", "href": "/", "source": "index.md" }
+      ]
+    },
+    {
+      "text": "LibOSDP",
+      "href": "/libosdp/",
+      "indexTitle": "LibOSDP Library",
+      "summary": "Build, cross-compile, secure, and ship the LibOSDP C library.",
+      "intro": "This section walks through taking LibOSDP from source to a working integration. Start with building and installing the library, then cross-compile it for your target, turn on secure channel for encrypted and authenticated links, and reach for the debugging tools when something misbehaves. The compatibility page tracks which OSDP features are supported.",
+      "items": [
+        { "text": "Build and Install", "href": "/libosdp/build-and-install", "source": "libosdp/build-and-install.md" },
+        { "text": "Cross Compiling", "href": "/libosdp/cross-compiling", "source": "libosdp/cross-compiling.md" },
+        { "text": "Secure Channel", "href": "/libosdp/secure-channel", "source": "libosdp/secure-channel.md" },
+        { "text": "Smartcard Commands", "href": "/libosdp/smartcard", "source": "libosdp/smartcard.md" },
+        { "text": "Debugging", "href": "/libosdp/debugging", "source": "libosdp/debugging.md" },
+        { "text": "Compatibility", "href": "/libosdp/compatibility", "source": "libosdp/compatibility.md" },
+        { "text": "Releases and Versioning", "href": "/libosdp/release-process", "source": "libosdp/release-process.md" }
+      ]
+    },
+    {
+      "text": "Protocol",
+      "href": "/protocol/",
+      "indexTitle": "OSDP Protocol",
+      "summary": "How OSDP works on the wire — packets, commands, replies, and PD capabilities.",
+      "intro": "These pages explain how the OSDP protocol works on the wire, independent of any one implementation. Begin with the introduction to the control panel and peripheral device model, then dig into the supported commands and replies, the on-wire packet structure, how large payloads travel as multi-part messages, and the PD capabilities that describe what a device can do. The FAQ collects common questions.",
+      "items": [
+        { "text": "Introduction", "href": "/protocol/introduction", "source": "protocol/introduction.md" },
+        { "text": "Commands and Replies", "href": "/protocol/commands-and-replies", "source": "protocol/commands-and-replies.md" },
+        { "text": "Packet Structure", "href": "/protocol/packet-structure", "source": "protocol/packet-structure.md" },
+        { "text": "Multi-part Messages", "href": "/protocol/multipart", "source": "protocol/multipart.md" },
+        { "text": "PD Capabilities", "href": "/protocol/pd-capabilities", "source": "protocol/pd-capabilities.md" },
+        { "text": "FAQ", "href": "/protocol/faq", "source": "protocol/faq.md" }
+      ]
+    },
+    {
+      "text": "C API",
+      "href": "/api/",
+      "indexTitle": "C API Reference",
+      "summary": "The LibOSDP C API — control panel, peripheral device, and supporting structures.",
+      "intro": "The C API reference documents the public LibOSDP interface, exposed through a single header. It is grouped into the control panel and peripheral device entry points, the structures that describe a PD and carry commands and events, and the channel abstraction LibOSDP uses to talk to the bus. Use these pages as the contract when integrating the library into your application.",
+      "items": [
+        { "text": "Control Panel", "href": "/api/control-panel", "source": "api/control-panel.md" },
+        { "text": "Peripheral Device", "href": "/api/peripheral-device", "source": "api/peripheral-device.md" },
+        { "text": "PD Info", "href": "/api/pd-info", "source": "api/pd-info.md" },
+        { "text": "Miscellaneous", "href": "/api/miscellaneous", "source": "api/miscellaneous.md" },
+        { "text": "Command Structure", "href": "/api/command-structure", "source": "api/command-structure.md" },
+        { "text": "Event Structure", "href": "/api/event-structure", "source": "api/event-structure.md" },
+        { "text": "Channel", "href": "/api/channel", "source": "api/channel.md" }
+      ]
+    },
+    {
+      "text": "Python",
+      "href": "/python/",
+      "indexTitle": "Python Bindings",
+      "summary": "Use LibOSDP from Python — installation, API reference, commands, and events.",
+      "intro": "The Python bindings wrap the LibOSDP C library so you can build control panel and peripheral device applications without writing C. Start with getting started for installation and a minimal example, then keep the API reference handy, and use the commands and events pages for the data structures exchanged with a connected device at runtime.",
+      "items": [
+        { "text": "Getting Started", "href": "/python/getting-started", "source": "python/getting-started.md" },
+        { "text": "Build and Install", "href": "/python/build-and-install", "source": "python/build-and-install.md" },
+        { "text": "Control Panel", "href": "/python/control-panel", "source": "python/control-panel.md" },
+        { "text": "Peripheral Device", "href": "/python/peripheral-device", "source": "python/peripheral-device.md" },
+        { "text": "Commands", "href": "/python/commands", "source": "python/commands.md" },
+        { "text": "Events", "href": "/python/events", "source": "python/events.md" },
+        { "text": "API Reference", "href": "/python/api", "source": "python/api.md" }
+      ]
+    },
+    {
+      "text": "osdpctl",
+      "href": "/osdpctl/",
+      "indexTitle": "osdpctl Tool",
+      "summary": "Deprecated CLI built on LibOSDP to set up and control OSDP devices from config files.",
+      "intro": "osdpctl is a command-line tool built on LibOSDP for setting up and controlling OSDP devices directly from configuration files — and a useful starting point for those learning to consume the library. It is deprecated and kept here for reference. The introduction covers running services and sending control commands; the configuration page documents every INI key.",
+      "items": [
+        { "text": "Introduction", "href": "/osdpctl/introduction", "source": "osdpctl/introduction.md" },
+        { "text": "Configuration", "href": "/osdpctl/configuration", "source": "osdpctl/configuration.md" }
+      ]
+    }
+  ]
+}
