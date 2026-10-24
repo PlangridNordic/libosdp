@@ -1,5 +1,5 @@
 #
-#  Copyright (c) 2019-2026 Siddharth Chandrasekaran <sidcha.dev@gmail.com>
+#  Copyright (c) 2019-2026 Siddharth Chandrasekaran <sidcha@osdp.dev>
 #
 #  SPDX-License-Identifier: Apache-2.0
 #
@@ -34,7 +34,7 @@ project(libosdp VERSION 4.0.0)
 set(LIBOSDP_PRERELEASE "dev")
 
 set(PROJECT_AUTHOR       "Siddharth Chandrasekaran")
-set(PROJECT_AUTHOR_EMAIL "sidcha.dev@gmail.com")
+set(PROJECT_AUTHOR_EMAIL "sidcha@osdp.dev")
 set(PROJECT_YEAR         "2019")
 set(PROJECT_ORG          "osdp-dev")
 set(PROJECT_URL          "https://github.com/osdp-dev/libosdp/")

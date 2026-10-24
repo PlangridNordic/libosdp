@@ -1,5 +1,5 @@
 #
-#  Copyright (c) 2026 Siddharth Chandrasekaran <sidcha.dev@gmail.com>
+#  Copyright (c) 2026 Siddharth Chandrasekaran <sidcha@osdp.dev>
 #
 #  SPDX-License-Identifier: Apache-2.0
 #
@@ -24,7 +24,7 @@ description: >-
 license: Apache-2.0
 
 maintainers:
-  - Siddharth Chandrasekaran <sidcha.dev@gmail.com>
+  - Siddharth Chandrasekaran <sidcha@osdp.dev>
 
 url: https://doc.osdp.dev/
 documentation: https://doc.osdp.dev/

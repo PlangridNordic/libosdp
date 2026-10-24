@@ -1,5 +1,5 @@
 #
-#  Copyright (c) 2021-2026 Siddharth Chandrasekaran <sidcha.dev@gmail.com>
+#  Copyright (c) 2021-2026 Siddharth Chandrasekaran <sidcha@osdp.dev>
 #
 #  SPDX-License-Identifier: Apache-2.0
 #
@@ -67,7 +67,7 @@ from .types import (
     PdId,
 )
 
-__author__ = "Siddharth Chandrasekaran <sidcha.dev@gmail.com>"
+__author__ = "Siddharth Chandrasekaran <sidcha@osdp.dev>"
 __copyright__ = "Copyright 2021-2026 Siddharth Chandrasekaran"
 __license__ = "Apache License, Version 2.0 (Apache-2.0)"
 

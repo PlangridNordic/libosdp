@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["vendor/LICENSE"]
 authors = [
-    { name = "Siddharth Chandrasekaran", email = "sidcha.dev@gmail.com" },
+    { name = "Siddharth Chandrasekaran", email = "sidcha@osdp.dev" },
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

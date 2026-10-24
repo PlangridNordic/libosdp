@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2026 Siddharth Chandrasekaran <siddharth@embedjournal.com>
+ * Copyright (c) 2020-2026 Siddharth Chandrasekaran <sidcha@osdp.dev>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
