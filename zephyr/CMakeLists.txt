@@ -125,7 +125,10 @@ if (CONFIG_LIBOSDP)
 	endif()
 
 	# Crypto backend (driven by the LIBOSDP_CRYPTO_BACKEND Kconfig choice)
-	if (CONFIG_LIBOSDP_CRYPTO_MBEDTLS)
+	if (CONFIG_LIBOSDP_CRYPTO_PSA)
+		message(STATUS "libosdp crypto backend: PSA Crypto API")
+		zephyr_library_sources(${OSDP_ROOT}/src/crypto/psa.c)
+	elseif (CONFIG_LIBOSDP_CRYPTO_MBEDTLS)
 		message(STATUS "libosdp crypto backend: MbedTLS")
 		zephyr_library_compile_definitions(OPT_OSDP_USE_MBEDTLS)
 		zephyr_library_sources(${OSDP_ROOT}/src/crypto/mbedtls.c)
@@ -140,6 +143,7 @@ if (CONFIG_LIBOSDP)
 	else()
 		message(FATAL_ERROR
 			"No LibOSDP crypto backend selected. "
-			"Enable CONFIG_LIBOSDP_CRYPTO_MBEDTLS or CONFIG_LIBOSDP_CRYPTO_TINYAES.")
+			"Enable CONFIG_LIBOSDP_CRYPTO_PSA, CONFIG_LIBOSDP_CRYPTO_MBEDTLS "
+			"or CONFIG_LIBOSDP_CRYPTO_TINYAES.")
 	endif()
 endif()

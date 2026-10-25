@@ -17,6 +17,7 @@
       "-<osdp_trs.c>",
       "-<crypto/mbedtls.c>",
       "-<crypto/openssl.c>",
+      "-<crypto/psa.c>",
       "+<../utils/src/disjoint_set.c>",
       "+<../utils/src/list.c>",
       "+<../utils/src/logger.c>",

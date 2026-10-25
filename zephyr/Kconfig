@@ -12,11 +12,27 @@ if LIBOSDP
 
 choice LIBOSDP_CRYPTO_BACKEND
 	prompt "LibOSDP crypto backend"
-	default LIBOSDP_CRYPTO_MBEDTLS
+	default LIBOSDP_CRYPTO_PSA
 	help
 		Select which AES implementation LibOSDP uses for secure
-		channel crypto. Pick MbedTLS if the application already
-		pulls it in; TinyAES otherwise for smallest footprint.
+		channel crypto. Pick PSA to use whatever crypto provider the
+		system has, including hardware AES; TinyAES for smallest
+		footprint with no external dependency.
+
+config LIBOSDP_CRYPTO_PSA
+	bool "PSA Crypto API"
+	select PSA_CRYPTO
+	select PSA_WANT_KEY_TYPE_AES
+	select PSA_WANT_ALG_ECB_NO_PADDING
+	select PSA_WANT_ALG_CBC_NO_PADDING
+	help
+		Use the PSA Crypto API for AES and for secure channel
+		randomness. The provider is whatever PSA_CRYPTO_PROVIDER
+		selects (Mbed TLS, TF-M, or an out-of-tree one), so hardware
+		crypto drivers behind it apply.
+
+		Needs Zephyr 4.3 or later, which introduced PSA_CRYPTO; on
+		older releases select LIBOSDP_CRYPTO_MBEDTLS instead.
 
 config LIBOSDP_CRYPTO_MBEDTLS
 	bool "MbedTLS"
@@ -25,8 +41,9 @@ config LIBOSDP_CRYPTO_MBEDTLS
 	select MBEDTLS_CIPHER_AES_ENABLED
 	select MBEDTLS_CIPHER_CCM_ENABLED
 	help
-		Use Zephyr's MbedTLS module for AES. Shares code with
-		the rest of the system if MbedTLS is already linked.
+		Use Zephyr's MbedTLS module for AES through its legacy
+		mbedtls_aes_* API, which Mbed TLS 4 (Zephyr 4.5 and later)
+		no longer provides; use PSA there.
 
 config LIBOSDP_CRYPTO_TINYAES
 	bool "TinyAES (in-tree)"
