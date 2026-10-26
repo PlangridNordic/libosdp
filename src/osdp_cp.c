@@ -27,6 +27,7 @@ enum osdp_cp_error_e {
 };
 
 static void notify_pd_id(struct osdp_pd *pd);
+static void notify_sc_status(struct osdp_pd *pd);
 static int cp_drain_queue(struct osdp_pd *pd,
 			  enum osdp_completion_status status);
 
@@ -974,10 +975,20 @@ out:
 
 static int cp_process_reply(struct osdp_pd *pd)
 {
+	bool sc_was_active = sc_is_active(pd);
 	uint8_t *buf;
-	int err, len;
+	int err, len = 0;
 
 	err = osdp_phy_check_packet(pd);
+	if (err == OSDP_ERR_PKT_NONE) {
+		len = osdp_phy_decode_packet(pd, &buf);
+	}
+
+	/* The phy ends a session whose MAC or encryption no longer checks
+	 * out on its own; the app hears of it before the reply is acted on. */
+	if (sc_was_active && !sc_is_active(pd)) {
+		notify_sc_status(pd);
+	}
 
 	/* Translate phy error codes to CP errors */
 	switch (err) {
@@ -1016,8 +1027,6 @@ static int cp_process_reply(struct osdp_pd *pd)
 		return OSDP_CP_ERR_GENERIC;
 	}
 
-	/* Valid OSDP packet in buffer */
-	len = osdp_phy_decode_packet(pd, &buf);
 	if (len <= 0) {
 		return OSDP_CP_ERR_GENERIC;
 	}

@@ -307,6 +307,99 @@ static int test_pd_phy_sc_setup_clears_cache(struct osdp *ctx)
 	return 0;
 }
 
+struct sc_notices {
+	int count;
+	bool last_active;
+};
+
+static int record_sc_notice(void *arg, struct osdp_cmd *cmd)
+{
+	struct sc_notices *n = arg;
+
+	if (cmd->id == OSDP_CMD_NOTIFICATION &&
+	    cmd->notif.type == OSDP_NOTIFICATION_SC_STATUS) {
+		n->count++;
+		n->last_active = cmd->notif.sc_status.active;
+	}
+	return 0;
+}
+
+/* Feed one command to a PD with a live session through a full refresh and
+ * report the SC notices the app was given. */
+static int pd_refresh_with_session(struct osdp *ctx, int seq_number,
+				   const uint8_t *packet, int len,
+				   struct sc_notices *notices)
+{
+	struct osdp_pd *p = osdp_to_pd(ctx, 0);
+
+	osdp_phy_state_reset(p, true);
+	p->seq_number = seq_number;
+	sc_activate(p);
+	p->sc_tstamp = osdp_millis_now();
+	p->tstamp = osdp_millis_now();
+	SET_FLAG(p, PD_FLAG_ENABLE_NOTIF);
+	/* osdp_pd_set_command_callback() is refused once the PD has been
+	 * refreshed, and every case here refreshes it. */
+	p->command_callback = record_sc_notice;
+	p->command_callback_arg = notices;
+
+	osdp_rb_push_buf(p->rx_rb, (uint8_t *)packet, len);
+	osdp_pd_refresh((osdp_t *)ctx);
+
+	p->command_callback = NULL;
+	p->command_callback_arg = NULL;
+	CLEAR_FLAG(p, PD_FLAG_ENABLE_NOTIF);
+	return sc_is_active(p) ? -1 : 0;
+}
+
+static int test_pd_phy_seq_zero_notifies_sc_down(struct osdp *ctx)
+{
+	struct osdp_pd *p = osdp_to_pd(ctx, 0);
+	struct sc_notices notices = { 0 };
+	uint8_t packet[32];
+	int pkt_len;
+
+	printf(SUB_1
+	       "Testing PD notifies SC down when the CP restarts at seq=0 -- ");
+
+	pkt_len = pd_test_build_cmd_packet(0x00 /* seq=0 */, CMD_POLL, NULL, 0,
+					   packet, sizeof(packet));
+	if (pd_refresh_with_session(ctx, 2, packet, pkt_len, &notices) ||
+	    notices.count != 1 || notices.last_active) {
+		printf("failed! sc=%d notices=%d last_active=%d\n",
+		       sc_is_active(p), notices.count, notices.last_active);
+		return -1;
+	}
+	printf("success!\n");
+	return 0;
+}
+
+static int test_pd_phy_bad_mac_notifies_sc_down(struct osdp *ctx)
+{
+	struct osdp_pd *p = osdp_to_pd(ctx, 0);
+	struct sc_notices notices = { 0 };
+	/* After the header: a 2-byte security block (SCS_15), the command
+	 * and a MAC that cannot match the session's. */
+	const uint8_t sec_block_tail[] = { SCS_15, CMD_POLL, 0, 0, 0, 0 };
+	uint8_t packet[32];
+	int pkt_len;
+
+	printf(SUB_1 "Testing PD notifies SC down on a bad command MAC -- ");
+
+	pkt_len =
+		pd_test_build_cmd_packet(0x09 /* SCB, seq=1 */, 2,
+					 sec_block_tail, sizeof(sec_block_tail),
+					 packet, sizeof(packet));
+	if (pd_refresh_with_session(ctx, 0, packet, pkt_len, &notices) ||
+	    notices.count != 1 || notices.last_active) {
+		printf("failed! sc=%d notices=%d last_active=%d\n",
+		       sc_is_active(p), notices.count, notices.last_active);
+		return -1;
+	}
+	printf("success!\n");
+	return 0;
+}
+
 static int test_pd_phy_setup(struct test *t)
 {
 	static uint8_t scbk[16] = {
@@ -484,6 +577,8 @@ void run_pd_phy_tests(struct test *t)
 	DO_TEST(t, test_pd_phy_seq_zero_clears_cache);
 	DO_TEST(t, test_pd_phy_sc_deactivate_clears_cache);
 	DO_TEST(t, test_pd_phy_sc_setup_clears_cache);
+	DO_TEST(t, test_pd_phy_seq_zero_notifies_sc_down);
+	DO_TEST(t, test_pd_phy_bad_mac_notifies_sc_down);
 	DO_TEST(t, test_pd_phy_max_len_with_mark_rejected);
 	DO_TEST(t, test_pd_phy_max_len_without_mark_accepted);
 

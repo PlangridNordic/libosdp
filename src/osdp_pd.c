@@ -1695,12 +1695,23 @@ static int pd_send_reply(struct osdp_pd *pd)
 
 static int pd_receive_and_process_command(struct osdp_pd *pd)
 {
-	int err, len;
+	bool sc_was_active = sc_is_active(pd);
+	int err, len = 0;
 	uint8_t *buf;
 
 	pd->reply_prebuilt = false;
 
 	err = osdp_phy_check_packet(pd);
+	if (err == OSDP_ERR_PKT_NONE) {
+		len = osdp_phy_decode_packet(pd, &buf);
+	}
+
+	/* The phy ends a session it can no longer trust (the CP restarted
+	 * the sequence, a MAC did not check out, a block did not decrypt)
+	 * on its own; the app hears of it before the packet is acted on. */
+	if (sc_was_active && !sc_is_active(pd)) {
+		notify_sc_status(pd);
+	}
 
 	/* Translate phy error codes to PD errors */
 	switch (err) {
@@ -1721,7 +1732,6 @@ static int pd_receive_and_process_command(struct osdp_pd *pd)
 		return err; /* propagate other errors as-is */
 	}
 
-	len = osdp_phy_decode_packet(pd, &buf);
 	if (len <= 0) {
 		if (len == OSDP_ERR_PKT_NACK) {
 			return OSDP_PD_ERR_REPLY; /* Send a NAK */

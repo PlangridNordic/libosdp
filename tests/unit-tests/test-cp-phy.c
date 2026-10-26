@@ -17,6 +17,7 @@ extern int test_osdp_phy_finalize_packet(struct osdp_pd *pd, uint8_t *buf,
 extern int test_osdp_phy_packet_init(struct osdp_pd *pd, uint8_t *buf, int max_len);
 extern uint16_t test_osdp_compute_crc16(const uint8_t *buf, size_t len);
 extern uint8_t test_osdp_compute_checksum(uint8_t *msg, int length);
+extern int test_cp_phy_state_update(struct osdp_pd *pd);
 
 struct refresh_yield_test_data {
 	int send_count;
@@ -605,6 +606,67 @@ static int test_phy_parse_hardcoded_sc_active_invalid_mac_reject(struct osdp *ct
 	CLEAR_FLAG(p, PD_FLAG_SKIP_SEQ_CHECK);
 	printf("success!\n");
 	return 0;
+}
+
+struct sc_notices {
+	int count;
+	bool last_active;
+};
+
+static int record_sc_notice(void *arg, int pd, struct osdp_event *ev)
+{
+	struct sc_notices *n = arg;
+
+	ARG_UNUSED(pd);
+	if (ev->type == OSDP_EVENT_NOTIFICATION &&
+	    ev->notif.type == OSDP_NOTIFICATION_SC_STATUS) {
+		n->count++;
+		n->last_active = ev->notif.sc_status.active;
+	}
+	return 0;
+}
+
+/* A reply whose MAC does not check out ends the session in the phy; the
+ * app must hear about it as it would for any other way a session ends. */
+static int test_cp_bad_mac_reply_notifies_sc_down(struct osdp *ctx)
+{
+	struct osdp_pd *p = GET_CURRENT_PD(ctx);
+	struct sc_notices notices = { 0 };
+	static const uint8_t packet[] = {
+#ifndef OPT_OSDP_SKIP_MARK_BYTE
+		0xff,
+#endif
+		0x53, 0xe5, 0x0d, 0x00, 0x09, 0x02, 0x16,
+		0x40, 0x00, 0x00, 0x00, 0x00, 0x5a
+	};
+	int rc = -1;
+
+	printf(SUB_1 "Testing CP notifies SC down on a bad reply MAC -- ");
+	reset_pd_packet_state(p);
+	memset(&p->sc, 0, sizeof(p->sc));
+	sc_activate(p);
+	SET_FLAG(p, PD_FLAG_SKIP_SEQ_CHECK);
+	SET_FLAG(p, PD_FLAG_ENABLE_NOTIF);
+	osdp_cp_set_event_callback((osdp_t *)ctx, record_sc_notice, &notices);
+	p->phy_state = OSDP_CP_PHY_STATE_REPLY_WAIT;
+	p->phy_tstamp = osdp_millis_now();
+	p->resp_timeout_ms = OSDP_RESP_TOUT_MS;
+	osdp_rb_push_buf(p->rx_rb, (uint8_t *)packet, sizeof(packet));
+
+	test_cp_phy_state_update(p);
+	if (sc_is_active(p) || notices.count != 1 || notices.last_active) {
+		printf("failed! sc=%d notices=%d last_active=%d\n",
+		       sc_is_active(p), notices.count, notices.last_active);
+		goto out;
+	}
+	printf("success!\n");
+	rc = 0;
+out:
+	osdp_cp_set_event_callback((osdp_t *)ctx, NULL, NULL);
+	CLEAR_FLAG(p, PD_FLAG_ENABLE_NOTIF);
+	CLEAR_FLAG(p, PD_FLAG_SKIP_SEQ_CHECK);
+	p->phy_state = OSDP_CP_PHY_STATE_IDLE;
+	return rc;
 }
 
 static int test_phy_parse_hardcoded_plaintext_when_sc_active_reject(struct osdp *ctx)
@@ -1706,6 +1768,7 @@ void run_cp_phy_tests(struct test *t)
 	DO_TEST(t, test_phy_parse_hardcoded_sc_invalid_type_reject);
 	DO_TEST(t, test_phy_parse_hardcoded_sc_inactive_scs16_reject);
 	DO_TEST(t, test_phy_parse_hardcoded_sc_active_invalid_mac_reject);
+	DO_TEST(t, test_cp_bad_mac_reply_notifies_sc_down);
 	DO_TEST(t, test_phy_parse_hardcoded_plaintext_when_sc_active_reject);
 	DO_TEST(t,
 		test_phy_parse_hardcoded_plaintext_nak_when_sc_active_reject);
