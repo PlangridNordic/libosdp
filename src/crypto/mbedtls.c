@@ -6,8 +6,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+
+#include <utils/utils.h>
 
 #include <mbedtls/aes.h>
 #include <mbedtls/platform_util.h>
@@ -20,6 +23,24 @@
 #endif
 
 #include <osdp.h>
+
+/*
+ * The crypto interface cannot report errors, and carrying on after one would
+ * leave predictable nonces or garbage ciphertext behind. assert() compiles
+ * out in release builds, so stop explicitly, as the other backends do.
+ */
+static void __noreturn osdp_mbedtls_fatal(void)
+{
+	abort();
+}
+
+/* Mbed TLS and PSA both report success as 0. */
+static void crypt_check(int rc)
+{
+	if (rc != 0) {
+		osdp_mbedtls_fatal();
+	}
+}
 
 #ifndef MBEDTLS_PSA_CRYPTO_C
 static mbedtls_entropy_context entropy_ctx;
@@ -43,11 +64,9 @@ static bool drbg_seeded;
 void osdp_crypt_setup()
 {
 #ifdef MBEDTLS_PSA_CRYPTO_C
-	psa_status_t status = psa_crypto_init();
-	assert(status == PSA_SUCCESS);
+	crypt_check(psa_crypto_init());
 #else
 	const char *version;
-	int rc;
 
 	if (drbg_seeded) {
 		return;
@@ -55,10 +74,10 @@ void osdp_crypt_setup()
 	version = osdp_get_version();
 	mbedtls_entropy_init(&entropy_ctx);
 	mbedtls_ctr_drbg_init(&ctr_drbg_ctx);
-	rc = mbedtls_ctr_drbg_seed(&ctr_drbg_ctx, mbedtls_entropy_func,
-				   &entropy_ctx, (const unsigned char *)version,
-				   strlen(version));
-	assert(rc == 0);
+	crypt_check(mbedtls_ctr_drbg_seed(&ctr_drbg_ctx, mbedtls_entropy_func,
+					  &entropy_ctx,
+					  (const unsigned char *)version,
+					  strlen(version)));
 	mbedtls_ctr_drbg_set_prediction_resistance(&ctr_drbg_ctx,
 						   MBEDTLS_CTR_DRBG_PR_ON);
 	drbg_seeded = true;
@@ -81,14 +100,14 @@ static void aes_crypt(int mode, uint8_t *key, uint8_t *iv, uint8_t *data,
 	} else {
 		rc = mbedtls_aes_setkey_dec(&aes_ctx, key, 128);
 	}
-	assert(rc == 0);
+	crypt_check(rc);
 	if (iv != NULL) {
 		rc = mbedtls_aes_crypt_cbc(&aes_ctx, mode, len, iv, data, data);
 	} else {
 		assert(len <= 16);
 		rc = mbedtls_aes_crypt_ecb(&aes_ctx, mode, data, data);
 	}
-	assert(rc == 0);
+	crypt_check(rc);
 	mbedtls_aes_free(&aes_ctx);
 }
 
@@ -105,15 +124,13 @@ void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 void osdp_fill_random(uint8_t *buf, int len)
 {
 #ifdef MBEDTLS_PSA_CRYPTO_C
-	psa_status_t status = psa_generate_random(buf, len);
-	assert(status == PSA_SUCCESS);
+	crypt_check(psa_generate_random(buf, len));
 #else
-	int rc;
-
 	/* An unseeded DRBG draws through a NULL entropy callback. */
-	assert(drbg_seeded);
-	rc = mbedtls_ctr_drbg_random(&ctr_drbg_ctx, buf, len);
-	assert(rc == 0);
+	if (!drbg_seeded) {
+		osdp_mbedtls_fatal();
+	}
+	crypt_check(mbedtls_ctr_drbg_random(&ctr_drbg_ctx, buf, len));
 #endif
 }
 
