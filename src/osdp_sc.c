@@ -240,8 +240,6 @@ void osdp_sc_setup(struct osdp_pd *pd)
 {
 	uint8_t scbk[16];
 
-	osdp_crypt_setup();
-
 	/* Any cached retransmit reply belongs to the previous session and
 	 * must not be re-emitted after a handshake. */
 	pd->last_tx_len = 0;

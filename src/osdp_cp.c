@@ -2696,6 +2696,7 @@ osdp_t *osdp_cp_setup(const struct osdp_channel *channel, int num_pd,
 	}
 
 	input_check_init(ctx);
+	osdp_crypt_setup();
 
 #ifndef OPT_OSDP_LOG_MINIMAL
 	logger_get_default(&ctx->logger);

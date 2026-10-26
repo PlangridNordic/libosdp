@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
@@ -20,71 +21,85 @@
 
 #include <osdp.h>
 
-static mbedtls_aes_context aes_ctx;
-
 #ifndef MBEDTLS_PSA_CRYPTO_C
 static mbedtls_entropy_context entropy_ctx;
 static mbedtls_ctr_drbg_context ctr_drbg_ctx;
+static bool drbg_seeded;
 #endif
 
+/*
+ * Runs from context setup, before any refresh loop can draw, so the
+ * unsynchronised seeded check only races if contexts are set up from several
+ * threads at once, which is not supported.
+ *
+ * The DRBG is seeded once and never freed: every context draws from it, and
+ * re-seeding it under a context that is still using it would pull its state
+ * away. With MBEDTLS_THREADING_C, mbedtls_ctr_drbg_random() serialises
+ * concurrent draws itself; without it, draws from several threads race.
+ * Prediction resistance pulls fresh entropy into every draw, so a forked
+ * process never repeats its parent's output; a draw happens once per secure
+ * channel handshake.
+ */
 void osdp_crypt_setup()
 {
-	mbedtls_aes_init(&aes_ctx);
-
 #ifdef MBEDTLS_PSA_CRYPTO_C
 	psa_status_t status = psa_crypto_init();
 	assert(status == PSA_SUCCESS);
 #else
+	const char *version;
 	int rc;
-	const char *version = osdp_get_version();
 
+	if (drbg_seeded) {
+		return;
+	}
+	version = osdp_get_version();
 	mbedtls_entropy_init(&entropy_ctx);
 	mbedtls_ctr_drbg_init(&ctr_drbg_ctx);
 	rc = mbedtls_ctr_drbg_seed(&ctr_drbg_ctx, mbedtls_entropy_func,
 				   &entropy_ctx, (const unsigned char *)version,
 				   strlen(version));
 	assert(rc == 0);
+	mbedtls_ctr_drbg_set_prediction_resistance(&ctr_drbg_ctx,
+						   MBEDTLS_CTR_DRBG_PR_ON);
+	drbg_seeded = true;
 #endif
+}
+
+/*
+ * Contexts may run their secure channels on different threads, so AES keeps
+ * no state between calls; each call sets up its own key schedule.
+ */
+static void aes_crypt(int mode, uint8_t *key, uint8_t *iv, uint8_t *data,
+		      int len)
+{
+	mbedtls_aes_context aes_ctx;
+	int rc;
+
+	mbedtls_aes_init(&aes_ctx);
+	if (mode == MBEDTLS_AES_ENCRYPT) {
+		rc = mbedtls_aes_setkey_enc(&aes_ctx, key, 128);
+	} else {
+		rc = mbedtls_aes_setkey_dec(&aes_ctx, key, 128);
+	}
+	assert(rc == 0);
+	if (iv != NULL) {
+		rc = mbedtls_aes_crypt_cbc(&aes_ctx, mode, len, iv, data, data);
+	} else {
+		assert(len <= 16);
+		rc = mbedtls_aes_crypt_ecb(&aes_ctx, mode, data, data);
+	}
+	assert(rc == 0);
+	mbedtls_aes_free(&aes_ctx);
 }
 
 void osdp_encrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 {
-	int rc;
-
-	if (iv != NULL) {
-		rc = mbedtls_aes_setkey_enc(&aes_ctx, key, 128);
-		assert(rc == 0);
-		rc = mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_ENCRYPT, len,
-					   iv, data, data);
-		assert(rc == 0);
-	} else {
-		assert(len <= 16);
-		rc = mbedtls_aes_setkey_enc(&aes_ctx, key, 128);
-		assert(rc == 0);
-		rc = mbedtls_aes_crypt_ecb(&aes_ctx, MBEDTLS_AES_ENCRYPT, data,
-					   data);
-		assert(rc == 0);
-	}
+	aes_crypt(MBEDTLS_AES_ENCRYPT, key, iv, data, len);
 }
 
 void osdp_decrypt(uint8_t *key, uint8_t *iv, uint8_t *data, int len)
 {
-	int rc;
-
-	if (iv != NULL) {
-		rc = mbedtls_aes_setkey_dec(&aes_ctx, key, 128);
-		assert(rc == 0);
-		rc = mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT, len,
-					   iv, data, data);
-		assert(rc == 0);
-	} else {
-		assert(len <= 16);
-		rc = mbedtls_aes_setkey_dec(&aes_ctx, key, 128);
-		assert(rc == 0);
-		rc = mbedtls_aes_crypt_ecb(&aes_ctx, MBEDTLS_AES_DECRYPT, data,
-					   data);
-		assert(rc == 0);
-	}
+	aes_crypt(MBEDTLS_AES_DECRYPT, key, iv, data, len);
 }
 
 void osdp_fill_random(uint8_t *buf, int len)
@@ -93,7 +108,11 @@ void osdp_fill_random(uint8_t *buf, int len)
 	psa_status_t status = psa_generate_random(buf, len);
 	assert(status == PSA_SUCCESS);
 #else
-	int rc = mbedtls_ctr_drbg_random(&ctr_drbg_ctx, buf, len);
+	int rc;
+
+	/* An unseeded DRBG draws through a NULL entropy callback. */
+	assert(drbg_seeded);
+	rc = mbedtls_ctr_drbg_random(&ctr_drbg_ctx, buf, len);
 	assert(rc == 0);
 #endif
 }
@@ -105,9 +124,4 @@ void osdp_fill_zeros(void *buf, int len)
 
 void osdp_crypt_teardown()
 {
-#ifndef MBEDTLS_PSA_CRYPTO_C
-	mbedtls_ctr_drbg_free(&ctr_drbg_ctx);
-	mbedtls_entropy_free(&entropy_ctx);
-#endif
-	mbedtls_aes_free(&aes_ctx);
 }

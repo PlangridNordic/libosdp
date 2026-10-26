@@ -167,10 +167,11 @@ static int test_scbkd_vectors(void *data)
 	memcpy(pd.sc.scbk, scbk_d, sizeof(scbk_d));
 
 	/*
-	 * osdp_sc_setup() initializes crypto backend and preserves scbk.
-	 * It may seed cp_random in CP mode, so overwrite with Annex E values
-	 * after.
+	 * No context setup runs here to initialise the crypto backend, so do
+	 * it directly. osdp_sc_setup() preserves scbk but may seed cp_random
+	 * in CP mode, so overwrite with Annex E values after.
 	 */
+	osdp_crypt_setup();
 	osdp_sc_setup(&pd);
 	memcpy(pd.sc.cp_random, cp_random, sizeof(cp_random));
 	memcpy(pd.sc.pd_random, pd_random, sizeof(pd_random));

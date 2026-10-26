@@ -1975,6 +1975,7 @@ osdp_t *osdp_pd_setup(struct osdp_channel *channel, const osdp_pd_info_t *info)
 	}
 
 	input_check_init(ctx);
+	osdp_crypt_setup();
 	ctx->_num_pd = 1;
 
 #ifndef OPT_OSDP_LOG_MINIMAL

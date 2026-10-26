@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <pthread.h>
+
 #include "test.h"
 
 extern int test_osdp_compute_mac(struct osdp_pd *pd, int is_cmd,
@@ -128,6 +130,58 @@ static int test_aes_cbc_encrypt_vector(struct osdp *ctx)
 		printf("AES-CBC encrypt vector mismatch\n");
 		hexdump(tv_ct_4blk, sizeof(tv_ct_4blk), SUB_1 "Expected");
 		hexdump(buf, sizeof(buf), SUB_1 "Found");
+		return -1;
+	}
+
+	return 0;
+}
+
+#define CONCURRENT_AES_ROUNDS 20000
+
+struct concurrent_aes {
+	uint8_t key[16];
+	uint8_t expected[16];
+	bool mismatch;
+};
+
+static void *concurrent_aes_worker(void *arg)
+{
+	struct concurrent_aes *w = arg;
+	uint8_t block[16];
+
+	for (int i = 0; i < CONCURRENT_AES_ROUNDS && !w->mismatch; i++) {
+		memcpy(block, tv_pt_4blk, sizeof(block));
+		osdp_encrypt(w->key, NULL, block, sizeof(block));
+		w->mismatch = memcmp(block, w->expected, sizeof(block)) != 0;
+	}
+	return NULL;
+}
+
+/* Every context runs its own secure channel, possibly on its own thread. */
+static int test_aes_concurrent_keys(struct osdp *ctx)
+{
+	struct concurrent_aes workers[2];
+	pthread_t threads[2];
+
+	ARG_UNUSED(ctx);
+
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < 16; j++) {
+			workers[i].key[j] = i ? tv_key[15 - j] : tv_key[j];
+		}
+		memcpy(workers[i].expected, tv_pt_4blk, 16);
+		osdp_encrypt(workers[i].key, NULL, workers[i].expected, 16);
+		workers[i].mismatch = false;
+	}
+	for (int i = 0; i < 2; i++) {
+		pthread_create(&threads[i], NULL, concurrent_aes_worker,
+			       &workers[i]);
+	}
+	for (int i = 0; i < 2; i++) {
+		pthread_join(threads[i], NULL);
+	}
+	if (workers[0].mismatch || workers[1].mismatch) {
+		printf("AES-ECB result changed under a concurrent key\n");
 		return -1;
 	}
 
@@ -414,6 +468,7 @@ void run_sc_tests(struct test *t)
 
 	DO_TEST(t, test_aes_cbc_encrypt_vector);
 	DO_TEST(t, test_aes_cbc_decrypt_vector);
+	DO_TEST(t, test_aes_concurrent_keys);
 	DO_TEST(t, test_sc_mac_cmd_one_block);
 	DO_TEST(t, test_sc_mac_cmd_four_blocks);
 	DO_TEST(t, test_sc_mac_reply_one_block);

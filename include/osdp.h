@@ -1959,6 +1959,9 @@ typedef void (*pd_event_completion_callback_t)(void *arg,
  * store the returned context pointer and pass it back to all OSDP functions
  * intact.
  *
+ * The first context setup initialises crypto state shared by every context,
+ * so contexts must not be set up from several threads at once.
+ *
  * @param channel Pointer to channel ops used for this PD context.
  * @param info Pointer to info struct populated by application.
  *
@@ -2117,6 +2120,9 @@ int osdp_pd_flush_events(osdp_t *ctx);
  * @brief This method is used to setup a device in CP mode. Application must
  * store the returned context pointer and pass it back to all OSDP functions
  * intact.
+ *
+ * The first context setup initialises crypto state shared by every context,
+ * so contexts must not be set up from several threads at once.
  *
  * @param channel Pointer to shared channel ops used for this CP context.
  * @param num_pd Number of PDs connected to this CP. The `osdp_pd_info_t *` is
