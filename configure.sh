@@ -224,7 +224,7 @@ if [[ ! -z "${CRYPTO_INCLUDE_DIR}" ]]; then
 fi
 
 if [[ ! -z "${CRYPTO_LD_FLAGS}" ]]; then
-	LDFLAGS+=" -I${CRYPTO_LD_FLAGS}"
+	LDFLAGS+=" ${CRYPTO_LD_FLAGS}"
 fi
 
 ## Declare sources
