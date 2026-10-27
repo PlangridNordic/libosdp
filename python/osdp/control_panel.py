@@ -316,6 +316,35 @@ class ControlPanel:
         with self.lock:
             return bool(self.ctx.is_pd_enabled(pd))
 
+    def trs_scan_enable(
+        self,
+        address: int,
+        mode0_dwell_ms: int = 0,
+        mode1_dwell_ms: int = 0,
+        hold_ms: int = 0,
+    ) -> bool:
+        """Enable the background TRS card-presence scan on a PD, so the
+        library itself briefly probes for a card without disrupting the
+        reader's normal mode - rather than the app blindly submitting
+        Start with no idea whether a card is actually present. Delivers a
+        CardInfo/CardPresent `events.Trs` when one shows up. Zero for any
+        *_ms value selects that parameter's built-in default.
+
+        @see osdp_cp_trs_scan_enable
+        """
+        pd = self.pd_addr.index(address)
+        with self.lock:
+            return bool(self.ctx.trs_scan_enable(pd, mode0_dwell_ms, mode1_dwell_ms, hold_ms))
+
+    def trs_scan_disable(self, address: int) -> bool:
+        """Disable the background TRS card-presence scan on a PD.
+
+        @see osdp_cp_trs_scan_disable
+        """
+        pd = self.pd_addr.index(address)
+        with self.lock:
+            return bool(self.ctx.trs_scan_disable(pd))
+
     # -- file transfer ------------------------------------------------------
 
     def register_file_ops(self, address: int, fops: FileOps) -> bool:

@@ -405,6 +405,63 @@ static PyObject *pyosdp_cp_is_pd_enabled(pyosdp_cp_t *self, PyObject *args)
 	Py_RETURN_FALSE;
 }
 
+#define pyosdp_cp_trs_scan_enable_doc                                          \
+	"trs_scan_enable(pd, mode0_dwell_ms=0, mode1_dwell_ms=0, hold_ms=0) -> bool\n" \
+	"\n"                                                                    \
+	"Enable the background TRS card-presence scan (osdp_cp_trs_scan_enable)\n" \
+	"so the library itself briefly probes for a card without disrupting\n" \
+	"the reader's normal mode, delivering a CardInfo/CardPresent event (see\n" \
+	"osdp.events.Trs) when one shows up - rather than the app blindly\n"   \
+	"submitting Start with no idea whether a card is actually present.\n"  \
+	"Zero for any *_ms value selects that parameter's built-in default."
+static PyObject *pyosdp_cp_trs_scan_enable(pyosdp_cp_t *self, PyObject *args)
+{
+	int pd;
+	unsigned int mode0 = 0, mode1 = 0, hold = 0;
+	struct osdp_trs_scan_params params;
+
+	if (!PyArg_ParseTuple(args, "I|III", &pd, &mode0, &mode1, &hold)) {
+		PyErr_SetString(PyExc_ValueError, "Invalid arguments");
+		return NULL;
+	}
+	if (pd < 0 || pd >= self->num_pd) {
+		PyErr_SetString(PyExc_ValueError, "Invalid PD offset");
+		return NULL;
+	}
+
+	params.mode0_dwell_ms = (uint16_t)mode0;
+	params.mode1_dwell_ms = (uint16_t)mode1;
+	params.hold_ms = (uint16_t)hold;
+
+	if (osdp_cp_trs_scan_enable(self->ctx, pd, &params))
+		Py_RETURN_FALSE;
+
+	Py_RETURN_TRUE;
+}
+
+#define pyosdp_cp_trs_scan_disable_doc                                        \
+	"trs_scan_disable(pd) -> bool\n"                                      \
+	"\n"                                                                  \
+	"Disable the background TRS card-presence scan (osdp_cp_trs_scan_disable)."
+static PyObject *pyosdp_cp_trs_scan_disable(pyosdp_cp_t *self, PyObject *args)
+{
+	int pd;
+
+	if (!PyArg_ParseTuple(args, "I", &pd)) {
+		PyErr_SetString(PyExc_ValueError, "Invalid arguments");
+		return NULL;
+	}
+	if (pd < 0 || pd >= self->num_pd) {
+		PyErr_SetString(PyExc_ValueError, "Invalid PD offset");
+		return NULL;
+	}
+
+	if (osdp_cp_trs_scan_disable(self->ctx, pd))
+		Py_RETURN_FALSE;
+
+	Py_RETURN_TRUE;
+}
+
 static PyObject *pyosdp_cp_modify_flag(pyosdp_cp_t *self, PyObject *args, bool do_set)
 {
 	int ret, pd, flags;
@@ -657,6 +714,10 @@ static PyMethodDef pyosdp_cp_tp_methods[] = {
 	  METH_VARARGS, pyosdp_cp_enable_pd_doc },
 	{ "is_pd_enabled", (PyCFunction)pyosdp_cp_is_pd_enabled,
 	  METH_VARARGS, pyosdp_cp_is_pd_enabled_doc },
+	{ "trs_scan_enable", (PyCFunction)pyosdp_cp_trs_scan_enable,
+	  METH_VARARGS, pyosdp_cp_trs_scan_enable_doc },
+	{ "trs_scan_disable", (PyCFunction)pyosdp_cp_trs_scan_disable,
+	  METH_VARARGS, pyosdp_cp_trs_scan_disable_doc },
 	{ NULL, NULL, 0, NULL } /* Sentinel */
 };
 

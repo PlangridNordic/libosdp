@@ -36,6 +36,8 @@ from .enums import (
     MpOutcome,
     NotificationType,
     StatusReportType,
+    TrsCardProtocol,
+    TrsCardStatus,
     TrsReply,
     TrsSessionStatus,
 )
@@ -570,11 +572,25 @@ class Trs:
     """Reader-defined error/NAK condition (not standardized by OSDP). Only
     for TrsReply.Error."""
 
+    protocol: TrsCardProtocol = TrsCardProtocol.Contactless
+    """Smart-card communication protocol. Only for TrsReply.CardInfo."""
+
+    csn: bytes = b""
+    """Card serial number. Only for TrsReply.CardInfo."""
+
+    protocol_data: bytes = b""
+    """ATR (contact) or ATS/ATQB (contactless). Only for TrsReply.CardInfo."""
+
+    card_status: TrsCardStatus = TrsCardStatus.Unknown
+    """Smart-card presence/interface. Only for TrsReply.CardPresent."""
+
     def __post_init__(self) -> None:
         check_range("reader", self.reader, UINT8_MAX)
         check_range("status", self.status, UINT8_MAX)
         check_range("code", self.code, UINT8_MAX)
         check_length("apdu", self.apdu, MAX_TRS_APDU_LEN)
+        check_length("csn", self.csn, _sys.TRS_CSN_MAX_LEN)
+        check_length("protocol_data", self.protocol_data, _sys.TRS_PROTOCOL_DATA_MAX_LEN)
 
 
 Event: TypeAlias = (

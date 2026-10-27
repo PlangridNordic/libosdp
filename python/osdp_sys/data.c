@@ -800,6 +800,19 @@ static int pyosdp_make_dict_event_trs(PyObject *obj, const void *payload)
 					      reply->card_data.apdu.length);
 	case OSDP_TRS_REPLY_ERROR:
 		return pyosdp_dict_add_int(obj, "code", reply->error.code);
+	case OSDP_TRS_REPLY_CARD_INFO:
+		if (pyosdp_dict_add_int(obj, "reader", reply->card_info.reader) ||
+		    pyosdp_dict_add_int(obj, "protocol", reply->card_info.protocol) ||
+		    pyosdp_dict_add_bytes(obj, "csn", reply->card_info.csn,
+					   reply->card_info.csn_len))
+			return -1;
+		return pyosdp_dict_add_bytes(obj, "protocol_data",
+					      reply->card_info.protocol_data,
+					      reply->card_info.protocol_data_len);
+	case OSDP_TRS_REPLY_CARD_PRESENT:
+		if (pyosdp_dict_add_int(obj, "reader", reply->card_present.reader))
+			return -1;
+		return pyosdp_dict_add_int(obj, "card_status", reply->card_present.status);
 	default:
 		PyErr_Format(PyExc_ValueError,
 			     "Unsupported TRS reply: %d", reply->reply);
@@ -840,6 +853,45 @@ static int pyosdp_make_struct_event_trs(void *payload, PyObject *dict)
 		if (pyosdp_dict_get_int(dict, "code", &val))
 			return -1;
 		reply->error.code = (uint8_t)val;
+		return 0;
+	case OSDP_TRS_REPLY_CARD_INFO: {
+		uint8_t *csn, *proto_data;
+		int csn_len, proto_data_len;
+
+		if (pyosdp_dict_get_int(dict, "reader", &val))
+			return -1;
+		reply->card_info.reader = (uint8_t)val;
+		if (pyosdp_dict_get_int(dict, "protocol", &val))
+			return -1;
+		reply->card_info.protocol = (enum osdp_trs_card_protocol_e)val;
+		if (pyosdp_dict_get_bytes(dict, "csn", &csn, &csn_len))
+			return -1;
+		if (csn_len > (int)sizeof(reply->card_info.csn)) {
+			PyErr_Format(PyExc_ValueError, "csn must be at most %zu bytes",
+				     sizeof(reply->card_info.csn));
+			return -1;
+		}
+		reply->card_info.csn_len = (uint8_t)csn_len;
+		memcpy(reply->card_info.csn, csn, csn_len);
+		if (pyosdp_dict_get_bytes(dict, "protocol_data", &proto_data, &proto_data_len))
+			return -1;
+		if (proto_data_len > (int)sizeof(reply->card_info.protocol_data)) {
+			PyErr_Format(PyExc_ValueError,
+				     "protocol_data must be at most %zu bytes",
+				     sizeof(reply->card_info.protocol_data));
+			return -1;
+		}
+		reply->card_info.protocol_data_len = (uint8_t)proto_data_len;
+		memcpy(reply->card_info.protocol_data, proto_data, proto_data_len);
+		return 0;
+	}
+	case OSDP_TRS_REPLY_CARD_PRESENT:
+		if (pyosdp_dict_get_int(dict, "reader", &val))
+			return -1;
+		reply->card_present.reader = (uint8_t)val;
+		if (pyosdp_dict_get_int(dict, "card_status", &val))
+			return -1;
+		reply->card_present.status = (enum osdp_trs_card_status_e)val;
 		return 0;
 	default:
 		PyErr_Format(PyExc_ValueError,

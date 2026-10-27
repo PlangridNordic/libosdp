@@ -33,6 +33,8 @@ from .enums import (
     StatusReportType,
     TemporaryLEDControlCode,
     TextControlCode,
+    TrsCardProtocol,
+    TrsCardStatus,
     TrsCommand,
     TrsReply,
 )
@@ -471,6 +473,10 @@ _EVENT_ENCODERS: dict[type, Callable[[Any], Payload]] = {
         "status": x.status,
         "apdu": x.apdu,
         "code": x.code,
+        "protocol": x.protocol,
+        "csn": x.csn,
+        "protocol_data": x.protocol_data,
+        "card_status": x.card_status,
     },
 }
 
@@ -511,6 +517,10 @@ _EVENT_DECODERS: dict[EventId, Callable[[Payload], e.Event]] = {
         status=p.get("status", 0),
         apdu=p.get("apdu", b""),
         code=p.get("code", 0),
+        protocol=TrsCardProtocol(p["protocol"]) if "protocol" in p else TrsCardProtocol.Contactless,
+        csn=p.get("csn", b""),
+        protocol_data=p.get("protocol_data", b""),
+        card_status=TrsCardStatus(p["card_status"]) if "card_status" in p else TrsCardStatus.Unknown,
     ),
 }
 

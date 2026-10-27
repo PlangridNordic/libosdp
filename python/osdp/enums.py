@@ -319,6 +319,31 @@ class TrsReply(_WireEnum):
 
     CardData = _sys.TRS_REPLY_CARD_DATA
     Error = _sys.TRS_REPLY_ERROR
+    CardInfo = _sys.TRS_REPLY_CARD_INFO
+    CardPresent = _sys.TRS_REPLY_CARD_PRESENT
+
+
+class TrsCardProtocol(_WireEnum):
+    """Smart-card communication protocol in a TRS CardInfo reply.
+
+    @see osdp_trs_card_protocol_e
+    """
+
+    Contact = _sys.TRS_CARD_PROTOCOL_CONTACT
+    Contactless = _sys.TRS_CARD_PROTOCOL_CONTACTLESS
+
+
+class TrsCardStatus(_WireEnum):
+    """Smart-card presence/interface in a TRS CardPresent reply.
+
+    @see osdp_trs_card_status_e
+    """
+
+    Unknown = _sys.TRS_CARD_STATUS_UNKNOWN
+    NotPresent = _sys.TRS_CARD_NOT_PRESENT
+    Present = _sys.TRS_CARD_PRESENT
+    PresentContactless = _sys.TRS_CARD_PRESENT_CONTACTLESS
+    PresentContact = _sys.TRS_CARD_PRESENT_CONTACT
 
 
 class TrsSessionStatus(_WireEnum):
