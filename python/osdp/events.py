@@ -36,6 +36,8 @@ from .enums import (
     MpOutcome,
     NotificationType,
     StatusReportType,
+    TrsReply,
+    TrsSessionStatus,
 )
 from .types import PdId
 
@@ -50,6 +52,7 @@ __all__ = [
     "ManufacturerStatus",
     "Notification",
     "Status",
+    "Trs",
 ]
 
 MAX_CARD_DATA_LEN = _sys.EVENT_CARDREAD_MAX_DATALEN
@@ -69,6 +72,9 @@ MAX_PIV_DATA_LEN = _sys.PIV_DATA_MAX_LEN
 
 MAX_STATUS_REPORT_LEN = _sys.STATUS_REPORT_MAX_LEN
 """Most entries a status report can carry."""
+
+MAX_TRS_APDU_LEN = _sys.TRS_APDU_MAX_LEN
+"""Longest C-APDU a Trs CardData reply can carry."""
 
 _RAW_CARD_FORMATS = (CardFormat.Unspecified, CardFormat.Wiegand)
 
@@ -413,6 +419,10 @@ class Notification:
     firmware_version: int = 0
     """PD firmware version. Only for NotificationType.PdId."""
 
+    trs_status: int = 0
+    """TRS card-session life-cycle state (C enum
+    osdp_trs_session_status_e). Only for NotificationType.TrsStatus."""
+
     @property
     def sc_active(self) -> bool:
         """Whether the secure channel is up.
@@ -447,6 +457,14 @@ class Notification:
             serial_number=self.serial_number,
             firmware_version=self.firmware_version,
         )
+
+    @property
+    def trs_session_status(self) -> TrsSessionStatus:
+        """The TRS card session's life-cycle state.
+
+        Only for NotificationType.TrsStatus (reads trs_status).
+        """
+        return TrsSessionStatus(self.trs_status)
 
     @property
     def mp_outcome(self) -> MpOutcome:
@@ -521,6 +539,44 @@ class CrAuth:
         check_length("data", self.data, MAX_PIV_DATA_LEN)
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Trs:
+    """A PD's answer to a `commands.Trs`: a Transparent Reader Support (TRS)
+    reply - the R-APDU answering a SendApdu, or an error/NAK.
+
+    `reply` selects which fields below are meaningful. CardInfo/CardPresent/
+    PinComplete exist on the wire (@see osdp_trs_reply_e) but are not bound
+    here yet.
+
+    @see osdp_event_trs, osdp_trs_reply
+    """
+
+    ID: ClassVar[EventId] = EventId.Trs
+
+    reply: TrsReply = TrsReply.CardData
+    """Which TRS reply this is. Selects which fields below apply."""
+
+    reader: int = 0
+    """Zero-based reader number. Only for TrsReply.CardData."""
+
+    status: int = 0
+    """Reader-defined result of the APDU exchange (not standardized by
+    OSDP). Only for TrsReply.CardData."""
+
+    apdu: bytes = b""
+    """The R-APDU returned by the card. Only for TrsReply.CardData."""
+
+    code: int = 0
+    """Reader-defined error/NAK condition (not standardized by OSDP). Only
+    for TrsReply.Error."""
+
+    def __post_init__(self) -> None:
+        check_range("reader", self.reader, UINT8_MAX)
+        check_range("status", self.status, UINT8_MAX)
+        check_range("code", self.code, UINT8_MAX)
+        check_length("apdu", self.apdu, MAX_TRS_APDU_LEN)
+
+
 Event: TypeAlias = (
     CardRead
     | KeyPress
@@ -534,5 +590,6 @@ Event: TypeAlias = (
     | CrAuth
     | Status
     | Notification
+    | Trs
 )
 """Any event. Match on it to tell the members apart."""

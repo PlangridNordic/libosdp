@@ -33,6 +33,8 @@ from .enums import (
     StatusReportType,
     TemporaryLEDControlCode,
     TextControlCode,
+    TrsCommand,
+    TrsReply,
 )
 from .errors import MarshalError
 
@@ -142,6 +144,10 @@ def _notification_payload(x) -> Payload:
             "serial_number": x.serial_number,
             "firmware_version": x.firmware_version,
         }
+    if x.type == NotificationType.TrsStatus:
+        # TrsStatus is CP-only (commands.Notification has no trs_status
+        # field), same as PdId above.
+        return {"type": x.type, "trs_status": x.trs_status}
     return {"type": x.type}
 
 
@@ -165,6 +171,9 @@ def _notification_from_payload(cls, p: Payload):
             serial_number=p.get("serial_number", 0),
             firmware_version=p.get("firmware_version", 0),
         )
+    # TrsStatus is likewise CP-only (see _notification_payload above).
+    if kwargs["type"] == NotificationType.TrsStatus:
+        kwargs.update(trs_status=p.get("trs_status", 0))
     return cls(**kwargs)
 
 
@@ -269,6 +278,11 @@ _COMMAND_ENCODERS: dict[type, Callable[[Any], Payload]] = {
         "command": CommandId.Notification,
         **_notification_payload(x),
     },
+    c.Trs: lambda x: {
+        "command": CommandId.Xwr,
+        "trs_command": x.command,
+        "apdu": x.apdu,
+    },
 }
 
 _COMMAND_DECODERS: dict[CommandId, Callable[[Payload], c.Command]] = {
@@ -341,6 +355,9 @@ _COMMAND_DECODERS: dict[CommandId, Callable[[Payload], c.Command]] = {
     ),
     CommandId.Notification: lambda p: _notification_from_payload(
         c.Notification, p
+    ),
+    CommandId.Xwr: lambda p: c.Trs(
+        command=TrsCommand(p["trs_command"]), apdu=p.get("apdu", b"")
     ),
 }
 
@@ -447,6 +464,14 @@ _EVENT_ENCODERS: dict[type, Callable[[Any], Payload]] = {
         "event": EventId.Notification,
         **_notification_payload(x),
     },
+    e.Trs: lambda x: {
+        "event": EventId.Trs,
+        "trs_reply": x.reply,
+        "reader": x.reader,
+        "status": x.status,
+        "apdu": x.apdu,
+        "code": x.code,
+    },
 }
 
 _EVENT_DECODERS: dict[EventId, Callable[[Payload], e.Event]] = {
@@ -479,6 +504,13 @@ _EVENT_DECODERS: dict[EventId, Callable[[Payload], e.Event]] = {
     EventId.CrAuth: lambda p: e.CrAuth(data=p["data"]),
     EventId.Notification: lambda p: _notification_from_payload(
         e.Notification, p
+    ),
+    EventId.Trs: lambda p: e.Trs(
+        reply=TrsReply(p["trs_reply"]),
+        reader=p.get("reader", 0),
+        status=p.get("status", 0),
+        apdu=p.get("apdu", b""),
+        code=p.get("code", 0),
     ),
 }
 

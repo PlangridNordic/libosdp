@@ -122,6 +122,8 @@ class CommandId(IntEnum):
     PivData = _sys.CMD_PIVDATA
     GenAuth = _sys.CMD_GENAUTH
     CrAuth = _sys.CMD_CRAUTH
+    Xwr = _sys.CMD_XWR
+    """Transparent Reader Support (TRS) command - see `osdp.commands.Trs`."""
 
 
 class EventId(IntEnum):
@@ -142,6 +144,8 @@ class EventId(IntEnum):
     PivData = _sys.EVENT_PIVDATAR
     GenAuth = _sys.EVENT_GENAUTHR
     CrAuth = _sys.EVENT_CRAUTHR
+    Trs = _sys.EVENT_TRS
+    """Transparent Reader Support (TRS) reply - see `osdp.events.Trs`."""
 
 
 class LEDColor(_WireEnum):
@@ -283,6 +287,57 @@ class NotificationType(IntEnum):
     PdId = _sys.NOTIFICATION_PD_ID
     """PD identity collected (CP mode). Carries the PD id fields (vendor_code,
     model, version, serial_number, firmware_version)."""
+
+    TrsStatus = _sys.NOTIFICATION_TRS_STATUS
+    """TRS card-session lifecycle changed (CP mode). Carries `trs_status`."""
+
+
+class TrsCommand(_WireEnum):
+    """Which TRS command `osdp.commands.Trs` carries.
+
+    Start/Stop open and close a card session; SendApdu carries a raw
+    C-APDU within one. EnterPin/CardScan exist on the wire but are not
+    bound here yet.
+
+    @see osdp_trs_cmd_e
+    """
+
+    Start = _sys.TRS_CMD_START
+    Stop = _sys.TRS_CMD_STOP
+    SendApdu = _sys.TRS_CMD_SEND_APDU
+
+
+class TrsReply(_WireEnum):
+    """Which TRS reply `osdp.events.Trs` carries.
+
+    CardData is the R-APDU answering a SendApdu; Error reports a NAK or a
+    failed card transaction. CardInfo/CardPresent/PinComplete exist on the
+    wire but are not bound here yet.
+
+    @see osdp_trs_reply_e
+    """
+
+    CardData = _sys.TRS_REPLY_CARD_DATA
+    Error = _sys.TRS_REPLY_ERROR
+
+
+class TrsSessionStatus(_WireEnum):
+    """Life-cycle of a TRS card session, carried by
+    `osdp.events.Notification.trs_status` when
+    `type` is `NotificationType.TrsStatus`.
+
+    @see osdp_trs_session_status_e
+    """
+
+    Opened = _sys.TRS_SESSION_OPENED
+    """The reader is in transparent mode; APDUs can flow."""
+
+    Closed = _sys.TRS_SESSION_CLOSED
+    """Stop was honoured; the reader is restored to its normal mode."""
+
+    Failed = _sys.TRS_SESSION_FAILED
+    """The PD refused transparent mode, or the session was aborted by a
+    link error."""
 
 
 class MpMsgType(_WireEnum):

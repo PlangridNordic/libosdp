@@ -562,6 +562,10 @@ static int pyosdp_make_dict_notification(PyObject *obj, const void *payload)
 					n->pd_id.firmware_version))
 			return -1;
 		break;
+	case OSDP_NOTIFICATION_TRS_STATUS:
+		if (pyosdp_dict_add_int(obj, "trs_status", n->trs_status.status))
+			return -1;
+		break;
 	default:
 		break;
 	}
@@ -626,10 +630,78 @@ static int pyosdp_make_struct_notification(void *payload, PyObject *dict)
 			return -1;
 		n->pd_id.firmware_version = (uint32_t)val;
 		break;
+	case OSDP_NOTIFICATION_TRS_STATUS:
+		if (pyosdp_dict_get_int(dict, "trs_status", &val))
+			return -1;
+		n->trs_status.status = (enum osdp_trs_session_status_e)val;
+		break;
 	default:
 		break;
 	}
 	return 0;
+}
+
+/*
+ * CMD_XWR carries the OSDP Transparent Reader Support (TRS) command/reply
+ * pair - see src/osdp_trs.c. struct osdp_trs_cmd's `command` selects a
+ * union: START/STOP (session open/close) carry no payload at all, the
+ * library drives the wire-level mode-set handshake by itself. SEND_APDU
+ * carries a raw C-APDU. ENTER_PIN/CARD_SCAN exist in the C struct but
+ * aren't bound here yet (slice 1 only needs START/STOP/SEND_APDU to prove
+ * the tunnel reaches the card at all).
+ */
+static int pyosdp_make_dict_cmd_xwr(PyObject *obj, const void *payload)
+{
+	const struct osdp_trs_cmd *cmd = payload;
+
+	if (pyosdp_dict_add_int(obj, "trs_command", cmd->command))
+		return -1;
+
+	switch (cmd->command) {
+	case OSDP_TRS_CMD_START:
+	case OSDP_TRS_CMD_STOP:
+		return 0;
+	case OSDP_TRS_CMD_SEND_APDU:
+		return pyosdp_dict_add_bytes(obj, "apdu", cmd->apdu.data,
+					      cmd->apdu.length);
+	default:
+		PyErr_Format(PyExc_ValueError,
+			     "Unsupported TRS command: %d", cmd->command);
+		return -1;
+	}
+}
+
+static int pyosdp_make_struct_cmd_xwr(void *payload, PyObject *dict)
+{
+	struct osdp_trs_cmd *cmd = payload;
+	int trs_command, len;
+	uint8_t *apdu;
+
+	if (pyosdp_dict_get_int(dict, "trs_command", &trs_command))
+		return -1;
+	cmd->command = (enum osdp_trs_cmd_e)trs_command;
+
+	switch (cmd->command) {
+	case OSDP_TRS_CMD_START:
+	case OSDP_TRS_CMD_STOP:
+		return 0;
+	case OSDP_TRS_CMD_SEND_APDU:
+		if (pyosdp_dict_get_bytes(dict, "apdu", &apdu, &len))
+			return -1;
+		if (len > (int)sizeof(cmd->apdu.data)) {
+			PyErr_Format(PyExc_ValueError,
+				     "apdu must be at most %zu bytes",
+				     sizeof(cmd->apdu.data));
+			return -1;
+		}
+		cmd->apdu.length = (uint16_t)len;
+		memcpy(cmd->apdu.data, apdu, len);
+		return 0;
+	default:
+		PyErr_Format(PyExc_ValueError,
+			     "Unsupported TRS command: %d", cmd->command);
+		return -1;
+	}
 }
 
 /* ------------------------------- */
@@ -703,6 +775,77 @@ static int pyosdp_make_struct_event_cardread(void *payload, PyObject *dict)
 	ev->length = (uint16_t)length;
 	memcpy(ev->data, data, nr_bytes);
 	return 0;
+}
+
+/*
+ * OSDP_EVENT_TRS reports CP-side TRS replies (struct osdp_trs_reply, keyed
+ * by `reply`). Slice 1 only needs CARD_DATA (the R-APDU answering a
+ * SEND_APDU) and ERROR (a NAK/failed card transaction) - CARD_INFO/
+ * CARD_PRESENT/PIN_COMPLETE aren't bound here yet.
+ */
+static int pyosdp_make_dict_event_trs(PyObject *obj, const void *payload)
+{
+	const struct osdp_trs_reply *reply = payload;
+
+	if (pyosdp_dict_add_int(obj, "trs_reply", reply->reply))
+		return -1;
+
+	switch (reply->reply) {
+	case OSDP_TRS_REPLY_CARD_DATA:
+		if (pyosdp_dict_add_int(obj, "reader", reply->card_data.reader) ||
+		    pyosdp_dict_add_int(obj, "status", reply->card_data.status))
+			return -1;
+		return pyosdp_dict_add_bytes(obj, "apdu",
+					      reply->card_data.apdu.data,
+					      reply->card_data.apdu.length);
+	case OSDP_TRS_REPLY_ERROR:
+		return pyosdp_dict_add_int(obj, "code", reply->error.code);
+	default:
+		PyErr_Format(PyExc_ValueError,
+			     "Unsupported TRS reply: %d", reply->reply);
+		return -1;
+	}
+}
+
+static int pyosdp_make_struct_event_trs(void *payload, PyObject *dict)
+{
+	struct osdp_trs_reply *reply = payload;
+	int trs_reply, val, len;
+	uint8_t *apdu;
+
+	if (pyosdp_dict_get_int(dict, "trs_reply", &trs_reply))
+		return -1;
+	reply->reply = (enum osdp_trs_reply_e)trs_reply;
+
+	switch (reply->reply) {
+	case OSDP_TRS_REPLY_CARD_DATA:
+		if (pyosdp_dict_get_int(dict, "reader", &val))
+			return -1;
+		reply->card_data.reader = (uint8_t)val;
+		if (pyosdp_dict_get_int(dict, "status", &val))
+			return -1;
+		reply->card_data.status = (uint8_t)val;
+		if (pyosdp_dict_get_bytes(dict, "apdu", &apdu, &len))
+			return -1;
+		if (len > (int)sizeof(reply->card_data.apdu.data)) {
+			PyErr_Format(PyExc_ValueError,
+				     "apdu must be at most %zu bytes",
+				     sizeof(reply->card_data.apdu.data));
+			return -1;
+		}
+		reply->card_data.apdu.length = (uint16_t)len;
+		memcpy(reply->card_data.apdu.data, apdu, len);
+		return 0;
+	case OSDP_TRS_REPLY_ERROR:
+		if (pyosdp_dict_get_int(dict, "code", &val))
+			return -1;
+		reply->error.code = (uint8_t)val;
+		return 0;
+	default:
+		PyErr_Format(PyExc_ValueError,
+			     "Unsupported TRS reply: %d", reply->reply);
+		return -1;
+	}
 }
 
 static const struct pyosdp_field event_keypress_fields[] = {
@@ -816,6 +959,10 @@ static const struct pyosdp_translator command_translator[OSDP_CMD_SENTINEL] = {
 		.to_dict = pyosdp_make_dict_notification,
 		.to_struct = pyosdp_make_struct_notification,
 	},
+	[OSDP_CMD_XWR] = {
+		.to_dict = pyosdp_make_dict_cmd_xwr,
+		.to_struct = pyosdp_make_struct_cmd_xwr,
+	},
 };
 
 static const struct pyosdp_translator event_translator[OSDP_EVENT_SENTINEL] = {
@@ -836,6 +983,10 @@ static const struct pyosdp_translator event_translator[OSDP_EVENT_SENTINEL] = {
 	[OSDP_EVENT_NOTIFICATION] = {
 		.to_dict = pyosdp_make_dict_notification,
 		.to_struct = pyosdp_make_struct_notification,
+	},
+	[OSDP_EVENT_TRS] = {
+		.to_dict = pyosdp_make_dict_event_trs,
+		.to_struct = pyosdp_make_struct_event_trs,
 	},
 };
 

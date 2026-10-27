@@ -222,8 +222,10 @@ license_file = "LICENSE"
 
 definitions = [
     "OPT_OSDP_PACKET_TRACE",
-    # osdp_sys exposes no TRS bindings yet; keep TRS out of the extension.
-    # "OPT_BUILD_OSDP_TRS",
+    # osdp_sys now binds CMD_XWR/REPLY_XRD (see data.c's cmd_translator/
+    # event_translator OSDP_CMD_XWR/OSDP_EVENT_TRS entries) - compile
+    # osdp_trs.c into the extension.
+    "OPT_BUILD_OSDP_TRS",
     # "OPT_OSDP_DATA_TRACE",
     # "OPT_OSDP_SKIP_MARK_BYTE",
 ]

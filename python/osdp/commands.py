@@ -46,6 +46,7 @@ from .enums import (
     StatusReportType,
     TemporaryLEDControlCode,
     TextControlCode,
+    TrsCommand,
 )
 
 __all__ = [
@@ -66,6 +67,7 @@ __all__ = [
     "TDSet",
     "TemporaryLEDParams",
     "Text",
+    "Trs",
 ]
 
 MAX_TEXT_LEN = _sys.CMD_TEXT_MAX_LEN
@@ -79,6 +81,11 @@ MAX_MFG_DATA_LEN = _sys.CMD_MFG_MAX_DATALEN
 #: Max smartcard/PIV payload a command or reply can carry, in bytes.
 MAX_PIV_DATA_LEN = _sys.PIV_DATA_MAX_LEN
 """Longest payload a Manufacturer command can carry."""
+
+MAX_TRS_APDU_LEN = _sys.TRS_APDU_MAX_LEN
+"""Longest C-APDU a Trs SendApdu command can carry. The real per-PD limit
+is usually smaller - query `ControlPanel.trs_max_apdu_len()` once the PD
+has been online, rather than assuming this bound."""
 
 MAX_BIO_TEMPLATE_LEN = _sys.CMD_BIOMATCH_MAX_TEMPLATE_LEN
 """Longest biometric template a BioMatch command can carry."""
@@ -697,6 +704,45 @@ class Notification:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class Trs:
+    """Transparent Reader Support (TRS) command - tunnel a smartcard C-APDU
+    through the PD to a card in the reader, or open/close the card session
+    that SendApdu needs to be inside.
+
+    `command` selects which of this dataclass's fields are meaningful:
+    Start/Stop carry none; SendApdu carries `apdu`. The PD answers with an
+    `events.Trs`, and session lifecycle is reported separately via
+    `events.Notification(type=NotificationType.TrsStatus)`.
+
+    EnterPin/CardScan exist on the wire (@see osdp_trs_cmd_e) but are not
+    bound here yet.
+
+    @see osdp_cmd_e.OSDP_CMD_XWR, osdp_trs_cmd
+
+    Example:
+        >>> cmd = Trs(command=TrsCommand.SendApdu, apdu=b"\x00\xa4\x04\x00")
+        >>> cmd.command.name
+        'SendApdu'
+    """
+
+    ID: ClassVar[CommandId] = CommandId.Xwr
+
+    command: TrsCommand = TrsCommand.Start
+    """Which TRS command this is. Selects which fields below apply."""
+
+    apdu: bytes = b""
+    """The C-APDU to send. Only for TrsCommand.SendApdu."""
+
+    def __post_init__(self) -> None:
+        if self.command is TrsCommand.SendApdu:
+            if not self.apdu:
+                raise ValueError("apdu must not be empty for SendApdu")
+            check_length("apdu", self.apdu, MAX_TRS_APDU_LEN)
+        elif self.apdu:
+            raise ValueError(f"apdu does not apply to {self.command.name}")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PivData:
     """Retrieve the contents of a PIV object from the PD's smartcard.
 
@@ -810,5 +856,6 @@ Command: TypeAlias = (
     | FileTransfer
     | Status
     | Notification
+    | Trs
 )
 """Any command. Match on it to tell the members apart."""
